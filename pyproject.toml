@@ -1,14 +1,14 @@
 [tool.poetry]
-name = "pydustry.py"
+name = "async-pydustry.py"
 version = "2.1.0"
 description = "Module for server information in the game Mindustry."
-repository = "https://github.com/RCR-OOP/pydustry.py"
+repository = "https://github.com/chredeur/pydustry.py"
 authors = [
     "Romanin <semina054@gmail.com>"
 ]
 license = "MIT"
 readme = "README.md"
-packages = [{include = "pydustry"}]
+packages = [{include = "async-pydustry"}]
 keywords = ["midnustry", "game", "server", "parser", "infomation"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
