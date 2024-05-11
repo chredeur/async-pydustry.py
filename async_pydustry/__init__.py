@@ -1,2 +1,2 @@
 from .utils import run_in_executor, Status
-from .async_pydustry import Server
+from .pydustry import Server
