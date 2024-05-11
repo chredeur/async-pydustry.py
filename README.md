@@ -1,16 +1,22 @@
 # Installation
 ```cmd
-pip install -U pydustry.py
+pip install git+https://github.com/chredeur/pydustry.py
 ```
 
 # Example
 - `main.py`
+
 ```python
+import asyncio
 import pydustry
 
-status = pydustry.Server("rcrms.ru").get_status()
 
-print(status)
+async def main():
+    status = pydustry.Server("pastanetwork.com").get_status()
+    print(status)
+
+
+asyncio.run(main())
 ```
 
 - `Return`
