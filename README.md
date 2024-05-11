@@ -8,11 +8,11 @@ pip install git+https://github.com/chredeur/pydustry.py
 
 ```python
 import asyncio
-import pydustry
+import async_pydustry
 
 
 async def main():
-    status = pydustry.Server("pastanetwork.com").get_status()
+    status = async_pydustry.Server("pastanetwork.com").get_status()
     print(status)
 
 
