@@ -12,7 +12,7 @@ import async_pydustry
 
 
 async def main():
-    status = async_pydustry.Server("pastanetwork.com").get_status()
+    status = await async_pydustry.Server("pastanetwork.com").get_status()
     print(status)
 
 
