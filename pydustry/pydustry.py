@@ -1,47 +1,32 @@
 from time import time
 from struct import unpack
-from dataclasses import dataclass
 from socket import socket, create_connection, AF_INET, SOCK_DGRAM
 from typing import Tuple
 
-@dataclass
-class Status:
-    name: str
-    map: str
-    players: int
-    wave: int
-    version: float
-    vertype: str
-    gamemode: int
-    limit: int
-    desc: int
-    modename: int
-    ping: int
+from .utils import run_in_executor, Status
 
-# ! Main Class
+
 class Server:
     def __init__(
-        self,
-        server_host: str,
-        server_port: int=6567,
-        input_port: int=6859
+            self,
+            server_host: str,
+            server_port: int = 6567,
+            input_port: int = 6859
     ) -> None:
         self.server: Tuple[str, int] = (server_host, server_port)
         self.input_server: Tuple[str, int] = (server_host, input_port)
-    
-    # ! Magic Methods
+
     def __str__(self) -> str:
         return f"{self.server[0]}:{self.server[1]}:{self.input_server[1]}"
-    
+
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({repr(self.__str__())})"
-    
-    # ! Main Method
-    def get_status(
-        self,
-        timeout: float=10.0,
-        encoding: str='utf-8',
-        errors: str='strict'
+
+    def _get_status(
+            self,
+            timeout: float,
+            encoding: str,
+            errors: str
     ) -> Status:
         info = {}
         s = socket(AF_INET, SOCK_DGRAM)
@@ -51,35 +36,52 @@ class Server:
         s.send(b"\xfe\x01")
         data = s.recv(1024)
         e_time = time()
-        info['name'] = data[1:data[0]+1].decode(encoding, errors)
-        data = data[data[0]+1:]
-        info['map'] = data[1:data[0]+1].decode(encoding, errors)
-        data = data[data[0]+1:]
+        s.close()
+        info['name'] = data[1:data[0] + 1].decode(encoding, errors)
+        data = data[data[0] + 1:]
+        info['map'] = data[1:data[0] + 1].decode(encoding, errors)
+        data = data[data[0] + 1:]
         info['players'] = unpack(">i", data[:4])[0]
         data = data[4:]
         info['wave'] = unpack(">i", data[:4])[0]
         data = data[4:]
         info['version'] = unpack(">i", data[:4])[0]
         data = data[4:]
-        info['vertype'] = data[1:data[0]+1].decode(encoding, errors)
-        data = data[data[0]+1:]
+        info['vertype'] = data[1:data[0] + 1].decode(encoding, errors)
+        data = data[data[0] + 1:]
         info['gamemode'] = unpack('>b', data[:1])[0]
         data = data[1:]
         info['limit'] = unpack(">i", data[:4])[0]
         data = data[4:]
-        info['desc'] = data[1:data[0]+1].decode(encoding, errors)
-        data = data[data[0]+1:]
-        info['modename'] = data[1:data[0]+1].decode(encoding, errors)
-        data = data[data[0]+1:]
+        info['desc'] = data[1:data[0] + 1].decode(encoding, errors)
+        data = data[data[0] + 1:]
+        info['modename'] = data[1:data[0] + 1].decode(encoding, errors)
+        data = data[data[0] + 1:]
         info['ping'] = round((e_time - s_time) * 1000)
         return Status(**info)
-    
-    def send_command(self, command: str) -> None:
-        s = create_connection(self.input_server)
+
+    async def get_status(
+            self,
+            timeout: float = 5.0,
+            encoding: str = 'utf-8',
+            errors: str = 'strict'
+    ) -> Status:
+        result = await run_in_executor(self._get_status, timeout, encoding, errors)
+        return result
+
+    def _send_command(self, command: str, timeout: float) -> None:
+        s = create_connection(self.input_server, timeout=timeout)
         s.sendall(command.encode())
         s.close()
-    
-    def ping(self, timeout: float=10.0) -> int:
+
+    async def send_command(
+            self,
+            command: str,
+            timeout: float = 5.0,
+    ) -> None:
+        return await run_in_executor(self._send_command, command, timeout)
+
+    def _ping(self, timeout: float) -> int:
         s = socket(AF_INET, SOCK_DGRAM)
         s.connect(self.server)
         s.settimeout(timeout)
@@ -87,4 +89,12 @@ class Server:
         s.send(b"\xfe\x01")
         s.recv(1024)
         e_time = time()
+        s.close()
         return round((e_time - s_time) * 1000)
+
+    async def ping(
+            self,
+            timeout: float = 5.0,
+    ) -> int:
+        result = await run_in_executor(self._ping, timeout)
+        return result
