@@ -8,7 +8,7 @@ authors = [
 ]
 license = "MIT"
 readme = "README.md"
-packages = [{include = "async-pydustry"}]
+packages = [{include = "async_pydustry"}]
 keywords = ["midnustry", "game", "server", "parser", "infomation"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
