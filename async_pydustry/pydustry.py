@@ -1,9 +1,10 @@
+import asyncio
 from time import time
 from struct import unpack
-from socket import socket, create_connection, AF_INET, SOCK_DGRAM
+from socket import socket, AF_INET, SOCK_DGRAM
 from typing import Tuple
 
-from .utils import run_in_executor, Status
+from .utils import Status
 
 
 class Server:
@@ -22,21 +23,26 @@ class Server:
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({repr(self.__str__())})"
 
-    def _get_status(
+    async def _get_status(
             self,
             timeout: float,
             encoding: str,
             errors: str
     ) -> Status:
         info = {}
-        s = socket(AF_INET, SOCK_DGRAM)
-        s.connect(self.server)
-        s.settimeout(timeout)
-        s_time = time()
-        s.send(b"\xfe\x01")
-        data = s.recv(1024)
-        e_time = time()
-        s.close()
+        loop = asyncio.get_running_loop()
+
+        with socket(AF_INET, SOCK_DGRAM) as s:
+            s.setblocking(False)
+            s.settimeout(timeout)
+            s.connect(self.server)
+
+            s_time = time()
+            await asyncio.wait_for(loop.sock_sendto(s, b"\xfe\x01", self.server), timeout=timeout)
+
+            data = await asyncio.wait_for(loop.sock_recv(s, 1024), timeout=timeout)
+            e_time = time()
+
         info['name'] = data[1:data[0] + 1].decode(encoding, errors)
         data = data[data[0] + 1:]
         info['map'] = data[1:data[0] + 1].decode(encoding, errors)
@@ -58,6 +64,7 @@ class Server:
         info['modename'] = data[1:data[0] + 1].decode(encoding, errors)
         data = data[data[0] + 1:]
         info['ping'] = round((e_time - s_time) * 1000)
+
         return Status(**info)
 
     async def get_status(
@@ -66,35 +73,43 @@ class Server:
             encoding: str = 'utf-8',
             errors: str = 'strict'
     ) -> Status:
-        result = await run_in_executor(self._get_status, timeout, encoding, errors)
-        return result
+        return await self._get_status(timeout, encoding, errors)
 
-    def _send_command(self, command: str, timeout: float) -> None:
-        s = create_connection(self.input_server, timeout=timeout)
-        s.sendall(command.encode())
-        s.close()
+    async def _send_command(self, command: str, timeout: float) -> None:
+        reader, writer = await asyncio.open_connection(
+            self.input_server[0], self.input_server[1]
+        )
+
+        writer.write(command.encode())
+        await asyncio.wait_for(writer.drain(), timeout=timeout)
+        writer.close()
+        await writer.wait_closed()
 
     async def send_command(
             self,
             command: str,
             timeout: float = 5.0,
     ) -> None:
-        return await run_in_executor(self._send_command, command, timeout)
+        await asyncio.wait_for(self._send_command(command, timeout), timeout=timeout)
 
-    def _ping(self, timeout: float) -> int:
-        s = socket(AF_INET, SOCK_DGRAM)
-        s.connect(self.server)
-        s.settimeout(timeout)
-        s_time = time()
-        s.send(b"\xfe\x01")
-        s.recv(1024)
-        e_time = time()
-        s.close()
+    async def _ping(self, timeout: float) -> int:
+        loop = asyncio.get_running_loop()
+
+        with socket(AF_INET, SOCK_DGRAM) as s:
+            s.setblocking(False)
+            s.settimeout(timeout)
+            s.connect(self.server)
+            s_time = time()
+
+            await asyncio.wait_for(loop.sock_sendto(s, b"\xfe\x01", self.server), timeout=timeout)
+
+            await asyncio.wait_for(loop.sock_recv(s, 1024), timeout=timeout)
+            e_time = time()
+
         return round((e_time - s_time) * 1000)
 
     async def ping(
             self,
             timeout: float = 5.0,
     ) -> int:
-        result = await run_in_executor(self._ping, timeout)
-        return result
+        return await self._ping(timeout)
